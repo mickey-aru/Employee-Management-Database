@@ -289,8 +289,12 @@ async function getHierarchy() {
       name: row.name,
       role: row.role,
       level: row.level,
-      children: [],
+      depth: (row.level) - 1,
+      team_size:0,
+      children: [], 
+     
     });
+     console.log("depth is",row.level - 1);
   }
 
   const roots = [];
@@ -300,9 +304,11 @@ async function getHierarchy() {
 
     if (parent) {
       parent.children.push(node);
+      parent.children.push(node);
     } else {
       // No manager (normal for the CEO). Several roots are allowed so odd data never breaks the UI.
       roots.push(node);
+     
     }
   }
 
