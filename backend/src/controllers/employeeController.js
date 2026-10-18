@@ -13,8 +13,11 @@ function handleError(err, res, next) {
 
 async function getEmployees(req, res, next) {
   try {
-    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
-    const employees = await employeeService.getAllEmployees(search);
+    const search = typeof req.query.search === 'string' ? req.query.search : '';
+    const level = typeof req.query.level === 'string' ? req.query.level : '';
+
+    console.log("level is ",level);
+    const employees = await employeeService.getAllEmployees(search,level);
     res.json({ success: true, data: employees });
   } catch (err) {
     handleError(err, res, next);
@@ -42,7 +45,8 @@ async function createEmployee(req, res, next) {
 async function deleteEmployee(req, res, next) {
   try {
     const removed = await employeeService.deleteEmployee(req.params.employeeId);
-    res.json({ success: true, message: 'Employee removed successfully.', data: removed });
+
+    res.json({ success: true, message: `${removed.name} (${removed.employee_id}) removed successfully` , data: removed });
   } catch (err) {
     handleError(err, res, next);
   }

@@ -142,18 +142,33 @@ function latestAllowedJoiningDate() {
 
 // ---------- queries ----------
 
-async function getAllEmployees(search) {
+async function getAllEmployees(search,level) {
   let sql = EMPLOYEE_SELECT;
   const params = [];
-
+   level = Number(level);
   if (search) {
     const pattern = `%${escapeLike(search)}%`;
     sql += ' WHERE e.employee_id LIKE ? OR e.name LIKE ? OR e.role LIKE ?';
     params.push(pattern, pattern, pattern);
   }
 
+  if(level){
+    console.log("got level value");
+    if(search){
+      sql += ' AND e.level = ?';
+    }
+    else{
+      sql += 'WHERE e.level = ?';
+    }
+  
+    params.push(level);
+  }
+  
+
   // Most senior first (level 1), then alphabetical.
   sql += ' ORDER BY e.level ASC, e.name ASC';
+
+  console.log("sql query is: ",sql)
 
   const [rows] = await pool.execute(sql, params);
   return rows.map(formatEmployee);
@@ -254,7 +269,7 @@ async function deleteEmployee(rawEmployeeId) {
     throw err;
   }
 
-  return { employee_id: employee.employee_id, name: employee.name };
+  return { employee_id: employee.employee_id, name: employee.name ,role: employee.role, level: employee.level};
 }
 
 // Builds the org tree with ONE query. The idea:

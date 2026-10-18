@@ -9,7 +9,11 @@ const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const app = express();
 
 // Only the local React dev server may call this API from a browser.
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
+app.use(cors(
+  { 
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173'
+   })
+  );
 app.use(express.json({ limit: '10kb' }));
 
 app.use('/api/employees', employeeRoutes);
