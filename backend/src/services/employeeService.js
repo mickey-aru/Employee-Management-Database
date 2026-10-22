@@ -40,7 +40,7 @@ function escapeLike(text) {
 // Looks up the raw row (including the internal id) for business-rule checks.
 async function findRowByEmployeeId(employeeId) {
   const [rows] = await pool.execute(
-    'SELECT id, employee_id, name, role, level FROM employees WHERE employee_id = ?',
+    'SELECT id, employee_id, name, role,salary, level FROM employees WHERE employee_id = ?',
     [employeeId]
   );
   return rows[0] || null;
@@ -52,6 +52,49 @@ function isRealDate(isoString) {
   const parsed = new Date(`${isoString}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === isoString;
 }
+
+function checkYearCompletion(joiningDate) {
+    const joinDate = new Date(joiningDate);
+    const today = new Date();
+
+    let years = today.getFullYear() - joinDate.getFullYear();
+
+    const anniversary = new Date(joinDate);
+    anniversary.setFullYear(joinDate.getFullYear() + years);
+
+    if (today < anniversary) {
+        years--;
+    }
+
+    return years;
+}
+
+function basePercentForYears(years){
+  let bonus = 0;
+  if(years < 1){
+    bonus += 0;
+  }
+  else if(years <= 2){
+    bonus += 3;
+  }
+  else if(years <= 5){
+    bonus += 7;
+  }
+  else{
+    bonus += 12;
+  }
+  return bonus;
+}
+
+function checkManger(emp, allEmp){
+  for(let i=0;i<allEmp.length;i++){
+    if(emp.id === allEmp[i].manager_id){
+      return true;
+    }
+  }
+  return false;
+}
+
 
 // ---------- validation ----------
 
@@ -142,10 +185,11 @@ function latestAllowedJoiningDate() {
 
 // ---------- queries ----------
 
-async function getAllEmployees(search,level) {
+async function getAllEmployees(search,level,bonus) {
   let sql = EMPLOYEE_SELECT;
   const params = [];
-   level = Number(level);
+  level = Number(level);
+
   if (search) {
     const pattern = `%${escapeLike(search)}%`;
     sql += ' WHERE e.employee_id LIKE ? OR e.name LIKE ? OR e.role LIKE ?';
@@ -171,6 +215,41 @@ async function getAllEmployees(search,level) {
   console.log("sql query is: ",sql)
 
   const [rows] = await pool.execute(sql, params);
+ 
+  // to find joining date from the datbase
+  console.log(typeof rows);
+  console.log("Full data is: ", rows);
+ if(bonus === 'true'){
+    for(let i=0; i<rows.length;i++){
+      if(i==0){
+        console.log("row 1 data is: ",rows[i]);
+      }
+      let joiningDate = rows[i].joining_date;
+      let total_year = checkYearCompletion(joiningDate);
+      let baseBonus = basePercentForYears(total_year);
+      let isManger = checkManger(rows[i],rows);
+      let mangerPionts = 0;
+      let totalPercent_bonus = 0;
+      if(isManger === true){
+        mangerPionts += 2;
+        totalPercent_bonus = baseBonus + mangerPionts;
+      }
+      let salaryAmount = rows[i].salary;
+      let bonus_amount = (salaryAmount/100) * baseBonus;
+
+      let bonus_Data = {
+        "years_of_service" : total_year,
+        "base_percent" : baseBonus,
+        "manager_extra_percent": mangerPionts,
+        "total_percent": totalPercent_bonus,
+        "amount" : bonus_amount
+      };
+      rows[i].bonus = bonus_Data;
+
+    }
+ }
+  
+
   return rows.map(formatEmployee);
 }
 
@@ -213,6 +292,13 @@ async function createEmployee(body) {
       );
     }
     managerInternalId = manager.id;
+    
+    console.log("new employee salary is : ",data.salary);
+    console.log("manager salary i s:",manager.salary);
+    if(manager.salary < data.salary){
+      throw managerError('manger salary can not less than employee salary');
+    }
+    console.log("manger salary is greater");
   }
 
   try {

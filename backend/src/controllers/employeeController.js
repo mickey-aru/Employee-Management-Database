@@ -15,9 +15,21 @@ async function getEmployees(req, res, next) {
   try {
     const search = typeof req.query.search === 'string' ? req.query.search : '';
     const level = typeof req.query.level === 'string' ? req.query.level : '';
+    const bonus = typeof req.query.bonus === 'string' ? req.query.bonus : null;
+
+    if(bonus ){
+      if(( bonus != 'false' ) & (bonus != 'true')){
+        res.status(400).json({
+          success:'false',
+          message : 'Invalide Request'
+        });
+      }
+    }
+    
 
     console.log("level is ",level);
-    const employees = await employeeService.getAllEmployees(search,level);
+    
+    const employees = await employeeService.getAllEmployees(search, level, bonus);
     res.json({ success: true, data: employees });
   } catch (err) {
     handleError(err, res, next);
