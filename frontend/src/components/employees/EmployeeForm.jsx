@@ -54,7 +54,7 @@ export default function EmployeeForm({ values, errors, managers, submitting, onC
             id="manager_employee_id"
             label="Manager"
             error={errors.manager_employee_id}
-            hint="Leave as root employee only for the top of the organisation."
+            hint="Must have a lower level number and an equal or higher salary. Leave as root employee only for the top of the organisation."
           >
             <select {...inputProps('manager_employee_id')}>
               <option value="">No Manager / Root Employee</option>

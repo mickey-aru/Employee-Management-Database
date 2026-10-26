@@ -18,19 +18,37 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [level, setLevel] = useState('');
+  const [levelOptions, setLevelOptions] = useState([]);
+  const [showBonus, setShowBonus] = useState(false);
 
+  // Level and bonus are applied by the backend, so changing them reloads the list.
   useEffect(() => {
+    let cancelled = false;
+
     async function loadEmployees() {
+      setLoading(true);
+      setError('');
       try {
-        setEmployees(await fetchEmployees());
+        const data = await fetchEmployees({ level, bonus: showBonus });
+        if (cancelled) return;
+        setEmployees(data);
+        // An unfiltered load sees every level, so use it to fill the dropdown.
+        if (!level) {
+          setLevelOptions([...new Set(data.map((employee) => employee.level))].sort((a, b) => a - b));
+        }
       } catch (err) {
-        setError(parseApiError(err).message);
+        if (!cancelled) setError(parseApiError(err).message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadEmployees();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [level, showBonus]);
 
   // The whole list is small, so filtering in the browser is instant and simple.
   const visibleEmployees = employees.filter((employee) => matchesSearch(employee, searchText));
@@ -38,6 +56,9 @@ export default function EmployeesPage() {
   function renderContent() {
     if (loading) return <StatusMessage type="loading" title="Loading employees…" />;
     if (error) return <StatusMessage type="error" title="Could not load employees">{error}</StatusMessage>;
+    if (employees.length === 0 && level) {
+      return <StatusMessage type="empty" title="No results">No employees at level {level}.</StatusMessage>;
+    }
     if (employees.length === 0) {
       return (
         <StatusMessage type="empty" title="No employees yet">
@@ -48,7 +69,7 @@ export default function EmployeesPage() {
     if (visibleEmployees.length === 0) {
       return <StatusMessage type="empty" title="No results">No employees match “{searchText.trim()}”.</StatusMessage>;
     }
-    return <EmployeeTable employees={visibleEmployees} />;
+    return <EmployeeTable employees={visibleEmployees} showBonus={showBonus} />;
   }
 
   return (
@@ -71,8 +92,20 @@ export default function EmployeesPage() {
           placeholder="Search by employee ID, name or role"
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
-          disabled={loading || Boolean(error)}
         />
+
+        <label htmlFor="level" className="visually-hidden">Filter by level</label>
+        <select id="level" value={level} onChange={(event) => setLevel(event.target.value)}>
+          <option value="">All levels</option>
+          {levelOptions.map((option) => (
+            <option key={option} value={option}>Level {option}</option>
+          ))}
+        </select>
+
+        <label className="checkbox">
+          <input type="checkbox" checked={showBonus} onChange={(event) => setShowBonus(event.target.checked)} />
+          Show bonus
+        </label>
       </div>
 
       {renderContent()}

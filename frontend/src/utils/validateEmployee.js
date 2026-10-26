@@ -40,5 +40,14 @@ export function validateEmployeeForm(values, managers) {
     }
   }
 
+  // A manager cannot earn less than the person who reports to them.
+  if (values.manager_employee_id && !errors.salary && !errors.manager_employee_id) {
+    const manager = managers.find((m) => m.employee_id === values.manager_employee_id);
+    if (manager && manager.salary < salary) {
+      errors.manager_employee_id =
+        `A manager's salary cannot be less than the employee's salary. ${manager.name} earns less than the salary entered.`;
+    }
+  }
+
   return errors;
 }

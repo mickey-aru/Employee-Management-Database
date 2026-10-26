@@ -17,6 +17,12 @@ export function formatDate(isoDate) {
   });
 }
 
+// "7%" or "9% (7% + 2% manager)" for the bonus breakdown returned by the API.
+export function formatBonusPercent(bonus) {
+  if (!bonus.manager_extra_percent) return `${bonus.total_percent}%`;
+  return `${bonus.total_percent}% (${bonus.base_percent}% + ${bonus.manager_extra_percent}% manager)`;
+}
+
 // "Rahul Verma (EMP002)" or an em dash when there is no manager.
 export function formatManager(employee) {
   if (!employee.manager_employee_id) return '—';

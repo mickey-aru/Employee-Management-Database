@@ -17,6 +17,10 @@ export default function HierarchyNode({ employee, depth = 0 }) {
           <span className="tree-role">{employee.role}</span>
           <span className="tree-name">{employee.name}</span>
           <span className="tree-id">{employee.employee_id}</span>
+          <span className="tree-meta">
+            Level {employee.level}
+            {employee.team_size > 0 && ` · ${employee.team_size} in team`}
+          </span>
         </div>
 
         {hasChildren && (
