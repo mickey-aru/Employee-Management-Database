@@ -6,8 +6,15 @@ const client = axios.create({
   timeout: 10000,
 });
 
-export async function fetchEmployees() {
-  const response = await client.get('/employees');
+// Optional filters (both handled by the backend):
+//   level: only employees at this level
+//   bonus: true adds a `bonus` object to every employee
+export async function fetchEmployees({ level, bonus } = {}) {
+  const params = {};
+  if (level) params.level = level;
+  if (bonus) params.bonus = 'true';
+
+  const response = await client.get('/employees', { params });
   return response.data.data;
 }
 
