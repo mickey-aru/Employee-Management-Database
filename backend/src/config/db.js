@@ -1,19 +1,25 @@
+
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
-// A pool keeps several connections open and hands them out per query,
-// which is faster and safer than opening a new connection for every request.
+const useSsl = process.env.DB_SSL === 'true';
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'employee_management',
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT || 4000),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+
+  // TLS for TiDB Cloud Starter public endpoint; set DB_SSL=true in live, leave unset locally
+  ssl: useSsl ? { minVersion: 'TLSv1.2' } : undefined,
+
   waitForConnections: true,
-  connectionLimit: 10,
-  // Return DATE columns as 'YYYY-MM-DD' strings instead of JS Date objects,
-  // which avoids timezone surprises.
+  connectionLimit: 5,
+  connectTimeout: 10000,
+  enableKeepAlive: true,
   dateStrings: true,
 });
 
 module.exports = pool;
+ 

@@ -86,15 +86,6 @@ function basePercentForYears(years){
   return bonus;
 }
 
-function checkManger(emp, allEmp){
-  for(let i=0;i<allEmp.length;i++){
-    if(emp.id === allEmp[i].manager_id){
-      return true;
-    }
-  }
-  return false;
-}
-
 
 // ---------- validation ----------
 
@@ -185,70 +176,56 @@ function latestAllowedJoiningDate() {
 
 // ---------- queries ----------
 
-async function getAllEmployees(search,level,bonus) {
+async function getAllEmployees(search, level, bonus) {
   let sql = EMPLOYEE_SELECT;
   const params = [];
+  const conditions = [];
   level = Number(level);
 
   if (search) {
     const pattern = `%${escapeLike(search)}%`;
-    sql += ' WHERE e.employee_id LIKE ? OR e.name LIKE ? OR e.role LIKE ?';
+    // Parentheses matter: without them AND would bind to the last LIKE only.
+    conditions.push('(e.employee_id LIKE ? OR e.name LIKE ? OR e.role LIKE ?)');
     params.push(pattern, pattern, pattern);
   }
 
-  if(level){
-    console.log("got level value");
-    if(search){
-      sql += ' AND e.level = ?';
-    }
-    else{
-      sql += 'WHERE e.level = ?';
-    }
-  
+  if (level) {
+    conditions.push('e.level = ?');
     params.push(level);
   }
-  
+
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(' AND ')}`;
+  }
 
   // Most senior first (level 1), then alphabetical.
   sql += ' ORDER BY e.level ASC, e.name ASC';
 
-  console.log("sql query is: ",sql)
-
   const [rows] = await pool.execute(sql, params);
- 
-  // to find joining date from the datbase
-  console.log(typeof rows);
-  console.log("Full data is: ", rows);
- if(bonus === 'true'){
-    for(let i=0; i<rows.length;i++){
-      if(i==0){
-        console.log("row 1 data is: ",rows[i]);
-      }
-      let joiningDate = rows[i].joining_date;
-      let total_year = checkYearCompletion(joiningDate);
-      let baseBonus = basePercentForYears(total_year);
-      let isManger = checkManger(rows[i],rows);
-      let mangerPionts = 0;
-      let totalPercent_bonus = 0;
-      if(isManger === true){
-        mangerPionts += 2;
-        totalPercent_bonus = baseBonus + mangerPionts;
-      }
-      let salaryAmount = rows[i].salary;
-      let bonus_amount = (salaryAmount/100) * baseBonus;
 
-      let bonus_Data = {
-        "years_of_service" : total_year,
-        "base_percent" : baseBonus,
-        "manager_extra_percent": mangerPionts,
-        "total_percent": totalPercent_bonus,
-        "amount" : bonus_amount
+  if (bonus === 'true') {
+    // Ask the database who manages people, so the answer is right even when
+    // `rows` is filtered (e.g. by level) and does not contain their reports.
+    const [managerRows] = await pool.execute(
+      'SELECT DISTINCT m.employee_id FROM employees e JOIN employees m ON e.manager_id = m.id'
+    );
+    const managerIds = new Set(managerRows.map((row) => row.employee_id));
+
+    for (const row of rows) {
+      const yearsOfService = checkYearCompletion(row.joining_date);
+      const basePercent = basePercentForYears(yearsOfService);
+      const managerExtraPercent = managerIds.has(row.employee_id) ? 2 : 0;
+      const totalPercent = basePercent + managerExtraPercent;
+
+      row.bonus = {
+        years_of_service: yearsOfService,
+        base_percent: basePercent,
+        manager_extra_percent: managerExtraPercent,
+        total_percent: totalPercent,
+        amount: Math.round(Number(row.salary) * totalPercent) / 100,
       };
-      rows[i].bonus = bonus_Data;
-
     }
- }
-  
+  }
 
   return rows.map(formatEmployee);
 }
@@ -296,7 +273,7 @@ async function createEmployee(body) {
     console.log("new employee salary is : ",data.salary);
     console.log("manager salary i s:",manager.salary);
     if(manager.salary < data.salary){
-      throw managerError('manger salary can not less than employee salary');
+      throw managerError(`A manager's salary cannot be less than the employee's salary. ${manager.name} earns less than the salary entered.`);
     }
     console.log("manger salary is greater");
   }
@@ -390,13 +367,23 @@ async function getHierarchy() {
 
     if (parent) {
       parent.children.push(node);
-      parent.children.push(node);
     } else {
       // No manager (normal for the CEO). Several roots are allowed so odd data never breaks the UI.
       roots.push(node);
      
     }
   }
+
+  // team_size = everyone below a node (direct and indirect reports).
+  function countTeam(node) {
+    let size = 0;
+    for (const child of node.children) {
+      size += 1 + countTeam(child);
+    }
+    node.team_size = size;
+    return size;
+  }
+  roots.forEach(countTeam);
 
   return roots;
 }
